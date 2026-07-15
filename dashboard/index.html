@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>工单运营概况</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="分析模块">
+        <div class="brand">
+          <span class="brand-mark">T</span>
+          <div>
+            <strong>工单分析</strong>
+            <span>Supervisor Console</span>
+          </div>
+        </div>
+        <nav class="nav-list">
+          <a href="#overview">总揽</a>
+          <a href="#trend">趋势分析</a>
+          <a href="#severity">严重程度</a>
+          <a href="#sla">处理时长</a>
+          <a href="#themes">重复问题</a>
+          <a href="#queue">优先队列</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="page-header" id="overview">
+          <div>
+            <p class="eyebrow">Ticket Operations Dashboard</p>
+            <h1>工单运营概况</h1>
+            <p class="header-note" id="periodText"></p>
+          </div>
+          <div class="header-tools">
+            <label class="setting-box" for="timeoutThreshold">
+              <span>超时设置</span>
+              <strong>
+                <input id="timeoutThreshold" type="number" min="1" step="1" value="24" inputmode="numeric">
+                <em>小时</em>
+              </strong>
+            </label>
+            <div class="source-box">
+              <span>数据源</span>
+              <strong id="ticketCount"></strong>
+            </div>
+          </div>
+        </header>
+
+        <section class="dashboard-section">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Overview</p>
+              <h2>总揽</h2>
+            </div>
+          </div>
+          <div class="kpi-grid" id="kpiGrid"></div>
+          <div class="overview-grid">
+            <div class="overview-panel">
+              <div class="panel-heading">
+                <h3>异常信号</h3>
+              </div>
+              <div class="signal-list" id="healthSignals"></div>
+            </div>
+            <div class="overview-panel">
+              <div class="panel-heading">
+                <h3>重点异常</h3>
+              </div>
+              <div class="anomaly-list" id="topAnomalies"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="dashboard-section" id="trend">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Trend</p>
+              <h2>趋势分析</h2>
+            </div>
+            <p class="section-value">发现最近哪些问题正在变多</p>
+          </div>
+          <article class="summary-note" id="trendSummary"></article>
+          <div class="module-grid">
+            <div class="module-wide">
+              <div class="panel-heading">
+                <h3>每日工单量</h3>
+              </div>
+              <div class="bar-chart" id="dailyTrendChart" aria-label="每日工单量柱状图"></div>
+            </div>
+            <div>
+              <div class="panel-heading">
+                <h3>类别增长倍数</h3>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>类别</th>
+                      <th>基线日均</th>
+                      <th>近期日均</th>
+                      <th>增长</th>
+                    </tr>
+                  </thead>
+                  <tbody id="growthTable"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="dashboard-section" id="severity">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Severity</p>
+              <h2>严重程度</h2>
+            </div>
+            <p class="section-value" id="severityRuleNote">区分数量多和风险高</p>
+          </div>
+          <article class="summary-note" id="severityFormulaNote"></article>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>类别</th>
+                  <th>数量</th>
+                  <th>风险</th>
+                  <th>高优先级率</th>
+                  <th>未解决率</th>
+                  <th id="lowSatisfactionHeader">低满意度率</th>
+                  <th>满意度</th>
+                </tr>
+              </thead>
+              <tbody id="severityTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="dashboard-section" id="sla">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Duration</p>
+              <h2>处理时长</h2>
+            </div>
+            <p class="section-value">定位积压和长尾处理</p>
+          </div>
+          <div class="module-grid">
+            <div>
+              <div class="panel-heading">
+                <h3>类别效率</h3>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>类别</th>
+                      <th>平均时长</th>
+                      <th>中位时长</th>
+                      <th id="timeoutHeader">超时（>24h）</th>
+                    </tr>
+                  </thead>
+                  <tbody id="slaTable"></tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <div class="panel-heading">
+                <h3>处理时长异常工单</h3>
+              </div>
+              <div class="outlier-list" id="outlierList"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="dashboard-section" id="themes">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Recurring Themes</p>
+              <h2>重复问题</h2>
+            </div>
+            <p class="section-value">找反复出现的原因线索</p>
+          </div>
+          <div class="theme-grid" id="themeGrid"></div>
+        </section>
+
+        <section class="dashboard-section" id="queue">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Priority Queue</p>
+              <h2>主管优先处理队列</h2>
+            </div>
+            <p class="section-value" id="queueRiskNote">按单票风险排序</p>
+          </div>
+          <div class="table-wrap queue-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>排序</th>
+                  <th>工单</th>
+                  <th>类别</th>
+                  <th>风险分</th>
+                  <th>原因</th>
+                  <th>建议动作</th>
+                </tr>
+              </thead>
+              <tbody id="queueTable"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
