@@ -2,6 +2,11 @@
 
 这是一个面向客服主管的前后端分离工单运营 Dashboard。Go 后端从工单 JSON 数据中计算趋势、异常、处理时长压力和单票风险，前端通过 API 获取报告并展示，帮助主管快速判断哪些问题正在变多、为什么值得关注、今天应该优先处理哪些工单。
 
+## 项目地址
+
+- 线上地址：http://47.80.31.30:18081/dashboard/index.html
+- GitHub：https://github.com/luoj0622-sys/task_tickets_analytics
+
 ## 运行方式
 
 默认数据源为 `config/task5_tickets.json`，作为项目配置数据随代码一起管理。
