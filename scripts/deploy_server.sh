@@ -9,10 +9,10 @@ IMAGE_NAME="${IMAGE_NAME:-$APP_NAME:latest}"
 CONTAINER_NAME="${CONTAINER_NAME:-$APP_NAME}"
 PORT="${PORT:-18081}"
 CONTAINER_PORT="${CONTAINER_PORT:-18081}"
-CONTAINER_DATA_PATH="${CONTAINER_DATA_PATH:-/app/data/task5_tickets.json}"
+CONTAINER_DATA_PATH="${CONTAINER_DATA_PATH:-/app/config/task5_tickets.json}"
 SOURCE_DIR="${SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 DATA_SOURCE="${DATA_SOURCE:-}"
-DEFAULT_LOCAL_DATA="/Users/a1-6/Downloads/task5_tickets.json"
+DEFAULT_CONFIG_DATA="$SOURCE_DIR/config/task5_tickets.json"
 
 log() {
   printf '\033[1;34m[deploy]\033[0m %s\n' "$*"
@@ -27,6 +27,7 @@ need_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "缺少命令：$1"
 }
 
+log "Docker 部署模式：服务器只需要安装 Docker，不需要安装 Go。"
 need_cmd docker
 
 DOCKER_CMD=(docker)
@@ -54,13 +55,14 @@ abs_path() {
 [[ -f "$SOURCE_DIR/go.mod" ]] || die "未找到 go.mod，请在项目根目录或设置 SOURCE_DIR 后执行。"
 [[ -f "$SOURCE_DIR/Dockerfile" ]] || die "未找到 Dockerfile。"
 [[ -d "$SOURCE_DIR/dashboard" ]] || die "未找到 dashboard 静态目录。"
+[[ -d "$SOURCE_DIR/config" ]] || die "未找到 config 配置目录。"
 
 if [[ -n "$DATA_SOURCE" ]]; then
   [[ -f "$DATA_SOURCE" ]] || die "DATA_SOURCE 指定的数据文件不存在：$DATA_SOURCE"
-elif [[ -f "$DEFAULT_LOCAL_DATA" ]]; then
-  DATA_SOURCE="$DEFAULT_LOCAL_DATA"
+elif [[ -f "$DEFAULT_CONFIG_DATA" ]]; then
+  DATA_SOURCE="$DEFAULT_CONFIG_DATA"
 else
-  die "未找到数据文件。请用 DATA_SOURCE=/path/to/task5_tickets.json $0 指定。"
+  die "未找到默认配置数据：$DEFAULT_CONFIG_DATA。请放入 config/task5_tickets.json，或用 DATA_SOURCE=/path/to/tickets.json $0 指定。"
 fi
 
 DATA_SOURCE="$(abs_path "$DATA_SOURCE")"

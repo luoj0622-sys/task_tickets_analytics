@@ -26,14 +26,15 @@ WORKDIR /app
 
 COPY --from=builder /out/ticket-server /app/ticket-server
 COPY dashboard /app/dashboard
+COPY config /app/config
 
-# 容器运行时通过只读挂载提供工单 JSON 数据。
-RUN mkdir -p /app/data && chown -R ticketapp:ticketapp /app
+# 默认工单 JSON 放在 /app/config 下；部署时仍可通过只读挂载覆盖同一路径。
+RUN chown -R ticketapp:ticketapp /app
 
 USER ticketapp
 
 ENV PORT=18081
-ENV DATA_PATH=/app/data/task5_tickets.json
+ENV DATA_PATH=/app/config/task5_tickets.json
 
 EXPOSE 18081
 

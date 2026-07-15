@@ -4,7 +4,7 @@
 
 ## 运行方式
 
-默认数据源为 `/Users/a1-6/Downloads/task5_tickets.json`。
+默认数据源为 `config/task5_tickets.json`，作为项目配置数据随代码一起管理。
 
 ```bash
 go run ./cmd/server -port 18081
@@ -25,6 +25,64 @@ http://127.0.0.1:18081/dashboard/index.html
 
 ```bash
 go run ./cmd/server -port 18081 -data /path/to/tickets.json
+```
+
+或通过环境变量指定：
+
+```bash
+DATA_PATH=/path/to/tickets.json go run ./cmd/server -port 18081
+```
+
+## Docker 一键部署
+
+服务器只需要安装并启动 Docker，不需要安装 Go；Go 编译会在 Docker 多阶段构建的 `builder` 阶段内完成。
+
+在已安装 Docker 的服务器上，将项目代码放到服务器后执行：
+
+```bash
+./scripts/deploy_server.sh
+```
+
+脚本会通过 `Dockerfile` 多阶段构建镜像，停止旧容器，挂载 `config/task5_tickets.json`，并启动新的 Docker 容器。默认镜像名为 `ticket-analysis:latest`，默认容器名为 `ticket-analysis`，默认端口为 `18081`。
+
+`Dockerfile` 使用两阶段构建：
+
+- `builder` 阶段基于 `golang:1.22-alpine`，只负责下载依赖并编译 Go 后端二进制。
+- `runtime` 阶段基于 `alpine:3.20`，只保留 `/app/ticket-server`、`/app/dashboard` 和 `/app/config`，默认读取 `/app/config/task5_tickets.json`。
+
+也可以手动构建镜像：
+
+```bash
+docker build -t ticket-analysis:latest .
+```
+
+常用配置：
+
+```bash
+PORT=8080 \
+IMAGE_NAME=ticket-analysis:latest \
+CONTAINER_NAME=ticket-analysis \
+./scripts/deploy_server.sh
+```
+
+如需临时使用另一份工单 JSON，可以覆盖默认配置数据：
+
+```bash
+DATA_SOURCE=/path/to/tickets.json ./scripts/deploy_server.sh
+```
+
+部署后访问：
+
+```text
+http://服务器IP:18081/dashboard/index.html
+```
+
+服务管理：
+
+```bash
+docker ps --filter name=ticket-analysis
+docker logs -f ticket-analysis
+docker restart ticket-analysis
 ```
 
 ## 分析维度
