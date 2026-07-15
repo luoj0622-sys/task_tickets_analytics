@@ -1,18 +1,15 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# 工单分析系统一键部署脚本。
-# 适用场景：在 Linux 服务器上从项目根目录执行，自动构建 Go 二进制、复制前端静态文件、
-# 写入 systemd 服务并启动。数据文件通过 DATA_SOURCE 指定，避免使用开发机上的绝对路径。
+# 工单分析系统 Docker 一键部署脚本。
+# 执行步骤：使用 Dockerfile 多阶段构建镜像 -> 停止旧容器 -> 挂载工单数据文件 -> 启动新容器 -> 健康检查。
 
 APP_NAME="${APP_NAME:-ticket-analysis}"
-SERVICE_NAME="${SERVICE_NAME:-$APP_NAME}"
-APP_USER="${APP_USER:-ticketapp}"
+IMAGE_NAME="${IMAGE_NAME:-$APP_NAME:latest}"
+CONTAINER_NAME="${CONTAINER_NAME:-$APP_NAME}"
 PORT="${PORT:-18081}"
-INSTALL_DIR="${INSTALL_DIR:-/opt/$APP_NAME}"
-BINARY_NAME="${BINARY_NAME:-ticket-server}"
-DATA_PATH="${DATA_PATH:-$INSTALL_DIR/data/task5_tickets.json}"
-STATIC_DIR="${STATIC_DIR:-$INSTALL_DIR/dashboard}"
+CONTAINER_PORT="${CONTAINER_PORT:-18081}"
+CONTAINER_DATA_PATH="${CONTAINER_DATA_PATH:-/app/data/task5_tickets.json}"
 SOURCE_DIR="${SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 DATA_SOURCE="${DATA_SOURCE:-}"
 DEFAULT_LOCAL_DATA="/Users/a1-6/Downloads/task5_tickets.json"
@@ -30,112 +27,77 @@ need_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "缺少命令：$1"
 }
 
-run_root() {
-  if [[ "${EUID}" -eq 0 ]]; then
-    "$@"
+need_cmd docker
+
+DOCKER_CMD=(docker)
+if ! docker info >/dev/null 2>&1; then
+  if command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
+    DOCKER_CMD=(sudo docker)
   else
-    sudo "$@"
+    die "当前用户无法连接 Docker，请启动 Docker Desktop/Colima，或将用户加入 docker 组。"
   fi
+fi
+
+docker_cmd() {
+  "${DOCKER_CMD[@]}" "$@"
 }
 
-if [[ "$(uname -s)" != "Linux" ]]; then
-  die "该脚本用于 Linux 服务器部署；当前系统为 $(uname -s)。"
-fi
-
-need_cmd go
-need_cmd install
-need_cmd systemctl
-if [[ "${EUID}" -ne 0 ]]; then
-  need_cmd sudo
-fi
+abs_path() {
+  local target="$1"
+  local dir
+  local base
+  dir="$(cd "$(dirname "$target")" && pwd)"
+  base="$(basename "$target")"
+  printf '%s/%s\n' "$dir" "$base"
+}
 
 [[ -f "$SOURCE_DIR/go.mod" ]] || die "未找到 go.mod，请在项目根目录或设置 SOURCE_DIR 后执行。"
+[[ -f "$SOURCE_DIR/Dockerfile" ]] || die "未找到 Dockerfile。"
 [[ -d "$SOURCE_DIR/dashboard" ]] || die "未找到 dashboard 静态目录。"
 
 if [[ -n "$DATA_SOURCE" ]]; then
   [[ -f "$DATA_SOURCE" ]] || die "DATA_SOURCE 指定的数据文件不存在：$DATA_SOURCE"
-elif [[ -f "$DATA_PATH" ]]; then
-  log "复用已部署数据文件：$DATA_PATH"
 elif [[ -f "$DEFAULT_LOCAL_DATA" ]]; then
   DATA_SOURCE="$DEFAULT_LOCAL_DATA"
 else
   die "未找到数据文件。请用 DATA_SOURCE=/path/to/task5_tickets.json $0 指定。"
 fi
 
-BUILD_DIR="$(mktemp -d)"
-cleanup() {
-  rm -rf "$BUILD_DIR"
-}
-trap cleanup EXIT
+DATA_SOURCE="$(abs_path "$DATA_SOURCE")"
 
-log "构建 Go 服务"
-(
-  cd "$SOURCE_DIR"
-  go build -trimpath -ldflags="-s -w" -o "$BUILD_DIR/$BINARY_NAME" ./cmd/server
-)
+log "使用 Docker 多阶段构建镜像：$IMAGE_NAME"
+docker_cmd build -t "$IMAGE_NAME" -f "$SOURCE_DIR/Dockerfile" "$SOURCE_DIR"
 
-log "准备部署目录：$INSTALL_DIR"
-run_root install -d -m 0755 "$INSTALL_DIR" "$INSTALL_DIR/bin" "$INSTALL_DIR/data" "$STATIC_DIR"
-
-if ! id -u "$APP_USER" >/dev/null 2>&1; then
-  log "创建系统用户：$APP_USER"
-  run_root useradd --system --user-group --home-dir "$INSTALL_DIR" --shell /usr/sbin/nologin "$APP_USER"
+if docker_cmd container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+  log "停止并删除旧容器：$CONTAINER_NAME"
+  docker_cmd rm -f "$CONTAINER_NAME" >/dev/null
 fi
 
-log "安装二进制和静态资源"
-run_root install -m 0755 "$BUILD_DIR/$BINARY_NAME" "$INSTALL_DIR/bin/$BINARY_NAME"
-run_root cp -R "$SOURCE_DIR/dashboard/." "$STATIC_DIR/"
+log "启动容器：$CONTAINER_NAME"
+docker_cmd run -d \
+  --name "$CONTAINER_NAME" \
+  --restart unless-stopped \
+  -p "$PORT:$CONTAINER_PORT" \
+  -e PORT="$CONTAINER_PORT" \
+  -e DATA_PATH="$CONTAINER_DATA_PATH" \
+  -v "$DATA_SOURCE:$CONTAINER_DATA_PATH:ro" \
+  "$IMAGE_NAME" >/dev/null
 
-if [[ -n "$DATA_SOURCE" ]]; then
-  log "复制数据文件：$DATA_SOURCE -> $DATA_PATH"
-  run_root install -m 0644 "$DATA_SOURCE" "$DATA_PATH"
-fi
-
-run_root chown -R "$APP_USER:$APP_USER" "$INSTALL_DIR"
-
-SERVICE_FILE="$BUILD_DIR/$SERVICE_NAME.service"
-cat >"$SERVICE_FILE" <<SERVICE
-[Unit]
-Description=Ticket Analysis Dashboard
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=$APP_USER
-Group=$APP_USER
-WorkingDirectory=$INSTALL_DIR
-ExecStart=$INSTALL_DIR/bin/$BINARY_NAME -port $PORT -data $DATA_PATH -static $STATIC_DIR
-Restart=always
-RestartSec=3
-Environment=PORT=$PORT
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=full
-ProtectHome=true
-ReadWritePaths=$INSTALL_DIR
-
-[Install]
-WantedBy=multi-user.target
-SERVICE
-
-log "安装 systemd 服务：$SERVICE_NAME"
-run_root install -m 0644 "$SERVICE_FILE" "/etc/systemd/system/$SERVICE_NAME.service"
-run_root systemctl daemon-reload
-run_root systemctl enable "$SERVICE_NAME"
-run_root systemctl restart "$SERVICE_NAME"
-
-log "等待服务启动"
+log "等待服务健康检查"
 if command -v curl >/dev/null 2>&1; then
-  for _ in $(seq 1 20); do
+  for _ in $(seq 1 30); do
     if curl -fsS "http://127.0.0.1:$PORT/api/health" >/dev/null; then
       log "部署完成：http://127.0.0.1:$PORT/dashboard/index.html"
-      log "查看状态：systemctl status $SERVICE_NAME"
+      log "查看容器：${DOCKER_CMD[*]} ps --filter name=$CONTAINER_NAME"
+      log "查看日志：${DOCKER_CMD[*]} logs -f $CONTAINER_NAME"
       exit 0
     fi
     sleep 1
   done
+else
+  log "未安装 curl，已跳过健康检查。请访问 http://127.0.0.1:$PORT/dashboard/index.html 验证。"
+  exit 0
 fi
 
-run_root systemctl status "$SERVICE_NAME" --no-pager || true
-die "服务启动后健康检查未通过，请查看：journalctl -u $SERVICE_NAME -n 100 --no-pager"
+docker_cmd logs --tail 100 "$CONTAINER_NAME" || true
+die "容器启动后健康检查未通过，请查看日志：${DOCKER_CMD[*]} logs -f $CONTAINER_NAME"
