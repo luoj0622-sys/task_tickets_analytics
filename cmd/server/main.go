@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	defaultDataPath     = "/Users/a1-6/Downloads/task5_tickets.json"
+	defaultDataPath     = "config/task5_tickets.json"
 	defaultPort         = "18081"
 	defaultTimeoutHours = 24.0
 	lowSatThreshold     = 2
@@ -150,7 +150,7 @@ var themeRules = []themeRule{
 }
 
 func main() {
-	dataPath := flag.String("data", defaultDataPath, "path to ticket JSON data")
+	dataPath := flag.String("data", envOrDefault("DATA_PATH", defaultDataPath), "path to ticket JSON data")
 	staticDir := flag.String("static", "dashboard", "path to dashboard static files")
 	port := flag.String("port", envOrDefault("PORT", defaultPort), "HTTP port")
 	flag.Parse()
@@ -250,7 +250,7 @@ func buildReport(tickets []ticket, sourcePath string, timeoutHours float64) (map
 	priorityQueue := buildPriorityQueue(tickets, timeoutHours)
 	summary := buildSummary(tickets, days, trend, severity, duration, timeoutHours)
 	brief := []string{}
-	// 总揽摘要只取排序后的前三条异常，给首页快速扫读使用。
+	// 总览摘要只取排序后的前三条异常，给首页快速扫读使用。
 	for index, item := range anomalies {
 		if index >= 3 {
 			break
@@ -748,7 +748,7 @@ func buildAnomalies(tickets []ticket, trend, severity, duration map[string]any, 
 }
 
 func buildSummary(tickets []ticket, days []time.Time, trend, severity, duration map[string]any, timeoutHours float64) map[string]any {
-	// 首页总揽聚合最常用的 KPI，目标是让主管先判断整体状态，再下钻模块。
+	// 首页总览聚合最常用的 KPI，目标是让主管先判断整体状态，再下钻模块。
 	durations := []float64{}
 	unresolvedCount := 0
 	highCount := 0
@@ -825,7 +825,7 @@ func buildHealthSignals(tickets []ticket, trend, severity, duration map[string]a
 	}
 	severityCategories := severity["categories"].([]map[string]any)
 	if len(severityCategories) > 0 {
-		// 服务风险取严重程度最高的类别，同时附上代表工单，方便从总揽直接定位。
+		// 服务风险取严重程度最高的类别，同时附上代表工单，方便从总览直接定位。
 		top := severityCategories[0]
 		category := top["category"].(string)
 		signals = append(signals, map[string]any{
